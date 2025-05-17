@@ -145,17 +145,6 @@
   #modal.show {
     transform: translate(-50%, -50%) scale(1);
   }
-
-  #modal button {
-    margin-top: 20px;
-    padding: 8px 24px;
-    background: #3498db;
-    border: none;
-    border-radius: 8px;
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-  }
 </style>
 </head>
 <body>
@@ -180,7 +169,6 @@
 
 <div id="modal">
   <div id="modal-text"></div>
-  <button id="modal-ok">Ok!</button>
 </div>
 
 <script>
@@ -218,21 +206,36 @@
   window.addEventListener('resize', preencherFigurinhas);
 
   const scriptURL = 'https://script.google.com/macros/s/AKfycbwldduWiMsIEYZPY_-vjFUMz8bGoza3sstlY8yJLoVwX5EQMKcBkfDYgquhVARl7Aq0/exec';
-  
-  const horariosFixos = [
-    '10:00','10:30','11:15',
-    '13:00','13:45','14:30','15:15','16:00',
-    '16:45','17:30','18:15','19:00','19:45'
-  ];
+
+  function gerarHorarios(inicio, fim) {
+    const horarios = [];
+    let [h, m] = inicio.split(':').map(Number);
+    const [hFim, mFim] = fim.split(':').map(Number);
+
+    while (h < hFim || (h === hFim && m < mFim)) {
+      let horaStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      horarios.push(horaStr);
+      m += 45;
+      if (m >= 60) {
+        m -= 60;
+        h += 1;
+      }
+    }
+    return horarios;
+  }
 
   function formatarDataBR(data) {
     const [ano, mes, dia] = data.split("-");
     return `${dia}/${mes}/${ano}`;
   }
 
+  function tempoEmMinutos(hora) {
+    const [h, m] = hora.split(':').map(Number);
+    return h * 60 + m;
+  }
+
   const modal = document.getElementById('modal');
   const modalText = document.getElementById('modal-text');
-  const modalOk = document.getElementById('modal-ok');
 
   function showModal(text) {
     modalText.textContent = text;
@@ -242,8 +245,6 @@
   function hideModal() {
     modal.classList.remove('show');
   }
-
-  modalOk.addEventListener('click', hideModal);
 
   document.getElementById('data').addEventListener('change', async function() {
     const dataSelecionada = this.value;
@@ -276,6 +277,20 @@
       diaSemanaSpan.textContent = "";
       showModal("Não é possível agendar para domingo.");
       return;
+    }
+
+    let horariosFixos = [];
+    if (diaSemana >= 1 && diaSemana <= 5) { 
+      horariosFixos = gerarHorarios("10:00", "20:00").filter(h => !(h >= "12:00" && h < "13:30"));
+    } else if (diaSemana === 6) { 
+      horariosFixos = gerarHorarios("10:00", "17:00").filter(h => !(h >= "12:00" && h < "13:30"));
+    }
+
+    // Filtrar horários anteriores se for o mesmo dia
+    if (dataDate.getTime() === hojeDate.getTime()) {
+      const agora = new Date();
+      const minutosAgora = agora.getHours() * 60 + agora.getMinutes();
+      horariosFixos = horariosFixos.filter(h => tempoEmMinutos(h) >= minutosAgora);
     }
 
     try {
