@@ -23,6 +23,7 @@
     justify-content: center;
     align-items: center;
     position: relative;
+    padding: 20px;
   }
 
   #stickers-container {
@@ -49,17 +50,20 @@
     position: relative;
     z-index: 1;
     background: rgba(255, 255, 255, 0.97);
-    padding: 32px 40px;
+    padding: 48px 50px;
     border-radius: 16px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     max-width: 420px;
     width: 100%;
     backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
   }
 
   h2 {
     text-align: center;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
     font-size: 1.6rem;
     color: #2c3e50;
   }
@@ -68,12 +72,12 @@
   input[type="date"],
   select {
     width: 100%;
-    padding: 12px;
-    margin-bottom: 18px;
+    padding: 16px;
     border: 2px solid #ddd;
     border-radius: 10px;
     font-size: 1rem;
     transition: border-color 0.3s ease;
+    margin-top: 6px;
   }
 
   input:focus,
@@ -82,14 +86,29 @@
     outline: none;
   }
 
+  label {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 8px;
+    display: inline-block;
+  }
+
+  #dia-da-semana {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-top: 35px;  /* alterado para descer o texto */
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
   button {
     width: 100%;
-    padding: 14px;
+    padding: 18px;
     background: #3498db;
     border: none;
     border-radius: 12px;
     color: white;
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     font-weight: bold;
     cursor: pointer;
     transition: background 0.3s ease;
@@ -101,8 +120,42 @@
 
   @media (max-width: 500px) {
     form {
-      padding: 24px;
+      padding: 32px 36px;
     }
+  }
+
+  /* Modal simples */
+  #modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    background: white;
+    border-radius: 12px;
+    padding: 24px 32px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    z-index: 1000;
+    max-width: 90vw;
+    width: 320px;
+    text-align: center;
+    font-size: 1.1rem;
+    color: #2c3e50;
+    transition: transform 0.25s ease-in-out;
+  }
+
+  #modal.show {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  #modal button {
+    margin-top: 20px;
+    padding: 8px 24px;
+    background: #3498db;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
   }
 </style>
 </head>
@@ -114,9 +167,10 @@
   <h2>Agende seu horário</h2>
   <input type="text" id="nome" placeholder="Seu nome" required />
 
-  <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 18px;">
-    <label for="data" style="white-space: nowrap;">Escolha a data</label>
-    <input type="date" id="data" required style="margin-bottom: 0;" />
+  <div>
+    <label for="data">Escolha a data</label>
+    <input type="date" id="data" required />
+    <div id="dia-da-semana"></div>
   </div>
 
   <select id="hora" required>
@@ -124,6 +178,11 @@
   </select>
   <button type="submit">Agendar</button>
 </form>
+
+<div id="modal">
+  <div id="modal-text"></div>
+  <button id="modal-ok">Ok!</button>
+</div>
 
 <script>
   const stickerUrls = [
@@ -174,22 +233,78 @@
     return `${dia}/${mes}/${ano}`;
   }
 
-  document.getElementById('data').addEventListener('change', async function() {
-    const dataSelecionada = formatarDataBR(this.value);
-    const response = await fetch('https://opensheet.elk.sh/1JtyvpySdzWgTMTeP2n5hdvTkLH6jNBuNzrtkNxa0WYc/1');
-    const agendados = await response.json();
-    const horariosOcupados = agendados.filter(e => e.Data === dataSelecionada).map(e => e.Hora);
+  // Modal show/hide
+  const modal = document.getElementById('modal');
+  const modalText = document.getElementById('modal-text');
+  const modalOk = document.getElementById('modal-ok');
 
+  function showModal(text) {
+    modalText.textContent = text;
+    modal.classList.add('show');
+  }
+
+  function hideModal() {
+    modal.classList.remove('show');
+  }
+
+  modalOk.addEventListener('click', hideModal);
+
+  document.getElementById('data').addEventListener('change', async function() {
+    const dataSelecionada = this.value;
+    const diaSemanaSpan = document.getElementById('dia-da-semana');
     const select = document.getElementById('hora');
+
+    diaSemanaSpan.textContent = "";
     select.innerHTML = '<option value="">Selecione o horário</option>';
-    horariosFixos.forEach(h => {
-      if (!horariosOcupados.includes(h)) {
+
+    if (!dataSelecionada) return;
+
+    const partes = dataSelecionada.split("-");
+    const dataDate = new Date(partes[0], partes[1] - 1, partes[2]);
+    const hojeDate = new Date();
+    hojeDate.setHours(0,0,0,0);
+
+    if (dataDate < hojeDate) {
+      this.value = "";
+      diaSemanaSpan.textContent = "";
+      showModal("Você não pode selecionar uma data anterior a hoje.");
+      return;
+    }
+
+    const diaSemana = dataDate.getDay(); // 0 = domingo
+
+    const dias = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    diaSemanaSpan.textContent = dias[diaSemana];
+
+    if (diaSemana === 0) {
+      this.value = "";
+      diaSemanaSpan.textContent = "";
+      showModal("Não é possível agendar para domingo.");
+      return;
+    }
+
+    try {
+      const response = await fetch('https://opensheet.elk.sh/1JtyvpySdzWgTMTeP2n5hdvTkLH6jNBuNzrtkNxa0WYc/1');
+      const agendados = await response.json();
+      const horariosOcupados = agendados.filter(e => e.Data === formatarDataBR(this.value)).map(e => e.Hora);
+
+      horariosFixos.forEach(h => {
+        if (!horariosOcupados.includes(h)) {
+          const opt = document.createElement('option');
+          opt.value = h;
+          opt.textContent = h;
+          select.appendChild(opt);
+        }
+      });
+    } catch {
+      // Se der erro, mostra todos os horários fixos
+      horariosFixos.forEach(h => {
         const opt = document.createElement('option');
         opt.value = h;
         opt.textContent = h;
         select.appendChild(opt);
-      }
-    });
+      });
+    }
   });
 
   document.getElementById('form').addEventListener('submit', async function(e) {
@@ -199,7 +314,7 @@
     const hora = document.getElementById('hora').value;
 
     if (!nome || !data || !hora) {
-      alert('Preencha todos os campos corretamente.');
+      showModal('Preencha todos os campos corretamente.');
       return;
     }
 
@@ -218,10 +333,10 @@
         const mensagem = `Olá! Agendei um horário:%0A%0ANome: ${nome}%0AData: ${data}%0AHora: ${hora}`;
         window.location.href = `https://wa.me/5548988750451?text=${mensagem}`;
       } else {
-        alert("Esse horário já foi reservado. Escolha outro.");
+        showModal("Esse horário já foi reservado. Escolha outro.");
       }
     } catch (err) {
-      alert("Erro ao agendar. Tente novamente.");
+      showModal("Erro ao agendar. Tente novamente.");
     }
   });
 </script>
