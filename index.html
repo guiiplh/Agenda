@@ -312,6 +312,8 @@
       return;
     }
 
+    showModal("Agendando seu horário, aguarde um pouco...");
+
     const formData = new URLSearchParams();
     formData.append("nome", nome);
     formData.append("data", data);
